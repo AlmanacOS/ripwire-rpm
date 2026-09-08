@@ -1,0 +1,5 @@
+/out/
+/rpmbuild/
+*.src.rpm
+*.rpm
+*.tar.gz

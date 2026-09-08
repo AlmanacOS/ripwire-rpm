@@ -1,0 +1,38 @@
+# Nudges COPR to rebuild ripwire. The custom source script resolves the newest
+# upstream release tag itself, so a rebuild is all that is needed to pick up a
+# new release — this workflow only has to fire the trigger.
+#
+# Setup: COPR package -> Settings -> Webhooks gives a "rebuild package" URL of the
+# form https://copr.fedorainfracloud.org/webhooks/custom/<id>/<uuid>/ripwire/
+# Store that whole URL as the repository secret COPR_WEBHOOK_URL.
+name: copr-rebuild
+
+on:
+  schedule:
+    # 07:15 UTC daily. A rebuild with an unchanged upstream tag is a no-op you pay
+    # a build slot for, so keep the cadence modest.
+    - cron: '15 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip if upstream has no new release
+        id: check
+        run: |
+          tag=$(curl -fsSL https://api.github.com/repos/redhat-et/ripwire/releases/latest | jq -r .tag_name)
+          echo "upstream tag: $tag"
+          built=$(curl -fsSL "https://copr.fedorainfracloud.org/api_3/package/?ownername=clemperorpenguin&projectname=AlmanacOS&packagename=ripwire&with_latest_succeeded_build=True" \
+                  | jq -r '.builds.latest_succeeded.source_package.version // "none"')
+          echo "copr version: $built"
+          if [ "${tag#v}" = "${built%%-*}" ]; then
+            echo "up to date; nothing to do"
+            echo "rebuild=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "rebuild=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger COPR rebuild
+        if: steps.check.outputs.rebuild == 'true'
+        run: curl -fsS -X POST "${{ secrets.COPR_WEBHOOK_URL }}"
