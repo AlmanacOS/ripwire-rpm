@@ -23,8 +23,13 @@ jobs:
         run: |
           tag=$(curl -fsSL https://api.github.com/repos/redhat-et/ripwire/releases/latest | jq -r .tag_name)
           echo "upstream tag: $tag"
-          built=$(curl -fsSL "https://copr.fedorainfracloud.org/api_3/package/?ownername=clemperorpenguin&projectname=AlmanacOS&packagename=ripwire&with_latest_succeeded_build=True" \
-                  | jq -r '.builds.latest_succeeded.source_package.version // "none"')
+          # latest, not latest_succeeded: ripwire builds EPEL 10 too, whose GCC 14 is
+          # untested against this C++23 tree. One failing chroot marks the whole build
+          # failed, and keying off latest_succeeded would then rebuild the same tag every
+          # day forever. Keying off the newest build of any state asks the real question:
+          # "has this tag been attempted yet?"
+          built=$(curl -fsSL "https://copr.fedorainfracloud.org/api_3/package/?ownername=clemperorpenguin&projectname=AlmanacOS&packagename=ripwire&with_latest_build=True" \
+                  | jq -r '.builds.latest.source_package.version // "none"')
           echo "copr version: $built"
           if [ "${tag#v}" = "${built%%-*}" ]; then
             echo "up to date; nothing to do"

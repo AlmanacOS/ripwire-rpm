@@ -13,6 +13,7 @@ is ever edited by hand.
 | `ripwire.spec` | The spec. Single source of truth; its `Version:` is a placeholder. |
 | `copr-custom-script.sh` | COPR *custom* source-method script — resolves the tag, builds the SRPM. |
 | `.github/workflows/copr-rebuild.yml` | Daily check that fires a COPR rebuild when upstream releases. |
+| `copr-cli-podman.sh` | Runs `copr-cli` in a container, for hosts without it (Silverblue/Kinoite). |
 
 ripwire vendors every dependency (tree-sitter core + 22 grammars, doctest, and four
 header-only libraries) under `third_party/`, and `CMakeLists.txt` hard-fails rather than
@@ -23,6 +24,16 @@ falling back to a network clone — so the build is fully offline, as COPR requi
 ```sh
 dnf install copr-cli          # then: copr-cli whoami   (login token from the COPR web UI)
 ```
+
+On an image-based host (Silverblue/Kinoite), use the bundled wrapper instead — it runs
+`copr-cli` in a container and takes the same arguments:
+
+```sh
+./copr-cli-podman.sh whoami
+```
+
+Either way `copr-cli` needs an API token at `~/.config/copr`, from
+https://copr.fedorainfracloud.org/api/ . Keep it mode 0600.
 
 The `AlmanacOS` project already carries a `ripwire` package, currently set to the **SCM**
 source method pointing at `redhat-et/ripwire` with `rpkg` — that configuration cannot
@@ -126,6 +137,11 @@ podman run --rm -v "$PWD":/pkg:ro,Z registry.fedoraproject.org/fedora:44 bash -c
   which is upstream's *dev* flavour: no `NDEBUG`, so asserts and `DEGRADED_PATH_ALERT` stay
   live in a binary users run. `RelWithDebInfo` is the same NDEBUG+LTO branch upstream's own
   release installer takes, and keeps the `-g` that the debuginfo subpackage needs.
+- **EPEL 10 is in the chroot set.** Its GCC 14 is untested against this C++23 tree, so that
+  chroot may fail while the Fedora ones succeed. The project's other packages already build
+  there, which is why the chroot list is the union rather than Fedora-only.
+- **The COPR script field is capped at 4 kB.** `copr-custom-script.sh` is written to stay
+  under it; put rationale in this file rather than in the script's comments.
 - **Version stamp.** There is no git metadata in a release tarball, so `--version` reports its
   git stamp as `unknown`. The version string itself comes from `CMakeLists.txt`, so it stays
   correct.
