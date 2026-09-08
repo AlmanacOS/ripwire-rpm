@@ -5,13 +5,13 @@ RPM packaging for [redhat-et/ripwire](https://github.com/redhat-et/ripwire), bui
 
 The package is built **from source** and always tracks the **newest upstream release tag**:
 `copr-custom-script.sh` asks the GitHub API for the latest release, downloads that tarball,
-rewrites `Version:` in `ripwire.spec`, and hands COPR the resulting SRPM. No version number
-is ever edited by hand.
+rewrites `Version:` in `ripwire.spec`, and stages both in COPR's result directory. No version
+number is ever edited by hand.
 
 | File | Role |
 | --- | --- |
 | `ripwire.spec` | The spec. Single source of truth; its `Version:` is a placeholder. |
-| `copr-custom-script.sh` | COPR *custom* source-method script — resolves the tag, builds the SRPM. |
+| `copr-custom-script.sh` | COPR *custom* source-method script — resolves the tag, stages spec + source. |
 | `.github/workflows/copr-rebuild.yml` | Daily check that fires a COPR rebuild when upstream releases. |
 | `copr-cli-podman.sh` | Runs `copr-cli` in a container, for hosts without it (Silverblue/Kinoite). |
 
@@ -45,7 +45,7 @@ copr-cli edit-package-custom AlmanacOS \
     --name ripwire \
     --script copr-custom-script.sh \
     --script-chroot fedora-latest-x86_64 \
-    --script-builddeps "bash coreutils curl jq tar sed findutils rpm-build git-core" \
+    --script-builddeps "bash coreutils curl jq tar sed grep" \
     --webhook-rebuild on
 ```
 
@@ -140,6 +140,10 @@ podman run --rm -v "$PWD":/pkg:ro,Z registry.fedoraproject.org/fedora:44 bash -c
 - **EPEL 10 is in the chroot set.** Its GCC 14 is untested against this C++23 tree, so that
   chroot may fail while the Fedora ones succeed. The project's other packages already build
   there, which is why the chroot list is the union rather than Fedora-only.
+- **The custom method wants a spec file and its sources, not an SRPM.** Staging a finished
+  `.src.rpm` in the result directory fails with `Copr build error: no spec file available`;
+  COPR builds the SRPM itself from what the script leaves there. The tarball's name has to
+  match `Source0`'s basename.
 - **The COPR script field is capped at 4 kB.** `copr-custom-script.sh` is written to stay
   under it; put rationale in this file rather than in the script's comments.
 - **Version stamp.** There is no git metadata in a release tarball, so `--version` reports its

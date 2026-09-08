@@ -3,7 +3,7 @@
 # tag at build time, so a rebuild picks up a new release with no edits here.
 #
 # COPR package settings that go with it (see README.md):
-#   Build dependencies: bash coreutils curl jq tar sed findutils rpm-build git-core
+#   Build dependencies: bash coreutils curl jq tar sed grep
 #   Chroot: fedora-latest-x86_64      Result directory: (empty)
 # COPR caps this script at 4 kB — keep it terse; rationale belongs in README.md.
 #
@@ -18,7 +18,7 @@ SPEC_URL="${SPEC_URL:-https://raw.githubusercontent.com/AlmanacOS/ripwire-rpm/ma
 resultdir="${COPR_RESULTDIR:-$PWD}"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
-mkdir -p "$resultdir" "$workdir/SOURCES"
+mkdir -p "$resultdir"
 
 say() { printf '==> %s\n' "$*" >&2; }
 
@@ -59,7 +59,7 @@ sed -i -e "s/^Version:.*/Version:        ${version}/" \
 grep -q "^Version:        ${version}\$" "$spec" || { echo "Version: not set" >&2; exit 1; }
 
 # ---- sources ----
-tarball="${workdir}/SOURCES/ripwire-${version}.tar.gz"
+tarball="${workdir}/ripwire-${version}.tar.gz"
 url="https://github.com/${UPSTREAM_REPO}/archive/${tag}/ripwire-${version}.tar.gz"
 say "downloading ${url}"
 curl -fsSL "$url" -o "$tarball"
@@ -75,10 +75,11 @@ if [ "$top" != "ripwire-${version}" ]; then
     rm -rf "${workdir:?}/ripwire-${version}"
 fi
 
-# ---- srpm ----
-say "building srpm"
-rpmbuild -bs "$spec" \
-    --define "_topdir ${workdir}" \
-    --define "_sourcedir ${workdir}/SOURCES" \
-    --define "_srcrpmdir ${resultdir}" \
-    --define "dist %{nil}"
+# ---- hand COPR the spec and its source ----
+# The custom method wants a spec file plus its sources in the result directory and builds
+# the SRPM itself. An .src.rpm staged here is ignored: "Copr build error: no spec file
+# available". The tarball name must match Source0's basename in the spec.
+say "staging spec + source in ${resultdir}"
+cp "$spec" "${resultdir}/ripwire.spec"
+mv "$tarball" "${resultdir}/ripwire-${version}.tar.gz"
+ls -l "$resultdir" >&2
