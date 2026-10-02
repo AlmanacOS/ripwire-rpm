@@ -17,10 +17,11 @@ Summary:        Ranked, deterministic repository map for coding agents
 
 # ripwire's own sources (src/, including src/infra/) are Apache-2.0 (LICENSE).
 # Vendored, statically linked into the binary (see THIRD_PARTY.md):
-#   MIT        - tree-sitter core + every grammar, doctest, unordered_dense, svector
-#   Apache-2.0 - gtl (btree.hpp and its headers)
-#   Zlib       - pdqsort
-License:        Apache-2.0 AND MIT AND Zlib
+#   MIT              - tree-sitter core + every grammar, doctest, unordered_dense, svector
+#   Apache-2.0       - gtl (btree.hpp and its headers), tree-sitter-elixir (with MIT)
+#   Zlib             - pdqsort
+#   Unicode-DFS-2016 - the ICU subset in tree-sitter's lib/src/unicode/
+License:        Apache-2.0 AND MIT AND Zlib AND Unicode-DFS-2016
 URL:            https://github.com/redhat-et/ripwire
 Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 
@@ -87,7 +88,14 @@ for dir in third_party/deps/*/; do
         install -Dpm 0644 "$lic" \
             %{buildroot}%{_defaultlicensedir}/%{name}/bundled/${dep}-LICENSE
     done
+    # Apache-2.0 asks for NOTICE files to travel with the code (tree-sitter-elixir has one).
+    if [ -f "${dir}NOTICE" ]; then
+        install -Dpm 0644 "${dir}NOTICE" \
+            %{buildroot}%{_defaultlicensedir}/%{name}/bundled/${dep}-NOTICE
+    fi
 done
+install -Dpm 0644 third_party/deps/tree_sitter/lib/src/unicode/LICENSE \
+    %{buildroot}%{_defaultlicensedir}/%{name}/bundled/tree_sitter-unicode-LICENSE
 
 %check
 # Smoke-test the binary that was actually built, and assert it reports the version the
